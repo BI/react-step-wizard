@@ -1,26 +1,20 @@
 var React = require('react');
-var Step = require('./step.jsx');
-var NavigationButton = require('./components/navigationButton.jsx');
-var NavigationBeads = require('./components/navigationBeads.jsx');
-var SlideReel = require('./components/slideReel.jsx');
+var createReactClass = require('create-react-class');
+var PropTypes = require('prop-types');
+var Step = require('./step');
+var NavigationButton = require('./components/navigationButton');
+var NavigationBeads = require('./components/navigationBeads');
+var SlideReel = require('./components/slideReel');
 var classNames = require('classnames');
 
-var EventsMixin = require('react-event-listener');
+var EventListener = require('react-event-listener').default;
 
 require('./react-step-wizard.scss');
 
 
-var StepWizard = React.createClass({
+var StepWizard = createReactClass({
   statics: {
     Step: Step,
-  },
-
-  mixins: [EventsMixin],
-
-  listeners: {
-    window: {
-      popstate: 'navigateBack'
-    }
   },
 
   getInitialState: function() {
@@ -31,12 +25,17 @@ var StepWizard = React.createClass({
 
   getDefaultProps: function() {
     return {
-      loopBeginning: true
+      loopBeginning: true,
+      loopBeginningIsValid: true
     };
   },
 
   propTypes: {
-    loopBeginning: React.PropTypes.bool
+    loopBeginning: PropTypes.bool,
+    onLoopBeginning: PropTypes.func,
+    loopBeginningTitle: PropTypes.string,
+    loopBeginningDescription: PropTypes.string,
+    loopBeginningIsValid: PropTypes.bool
   },
 
   consts: {
@@ -48,6 +47,7 @@ var StepWizard = React.createClass({
   },
 
   componentDidMount: function() {
+    // window.addEventListener('popstate', this.navigateBack.bind(this))
     this.onMountHistoryFix();
   },
 
@@ -56,8 +56,6 @@ var StepWizard = React.createClass({
     if(!window.history.pushState) {
       return;
     }
-
-    console.log('Initial History fix happened');
 
     //This will reset the history when you navigate away from thise page and hit back
     if(window.history.state && window.history.state.currentStepIndex > 0) {
@@ -76,11 +74,11 @@ var StepWizard = React.createClass({
     if(!event || !event.state) {
       return;
     }
-    
+
     if(this.state.currentStepIndex === event.state.currentStepIndex) {
       return;
     }
-    
+
     this.moveToPage(event.state.currentStepIndex);
   },
 
@@ -100,7 +98,7 @@ var StepWizard = React.createClass({
     if(index <= window.history.state.currentStepIndex) {
       return;
     }
-    
+
     window.history.pushState({currentStepIndex: index}, 'Step ' + index);
   },
 
@@ -129,7 +127,17 @@ var StepWizard = React.createClass({
     var maxIndex = React.Children.count(this.props.children) - 1;
 
     if(stepIndex === maxIndex && this.props.loopBeginning) {
-      stepIndex = 0;
+      if(this.props.onLoopBeginning) {
+        this.props.onLoopBeginning();
+      }
+      // If it is not valid to loop to the beggining step then stay on the last step
+      if(!this.props.loopBeginningIsValid) {
+        stepIndex = maxIndex;
+      }
+      else {
+        stepIndex = 0;
+      }
+      
     } else {
       stepIndex = Math.min(stepIndex + 1, maxIndex);
     }
@@ -141,7 +149,7 @@ var StepWizard = React.createClass({
     var stepIndex = this.state.currentStepIndex;
 
     stepIndex = Math.max(stepIndex - 1, 0);
-    
+
     this.moveToPage(stepIndex);
   },
 
@@ -185,6 +193,10 @@ var StepWizard = React.createClass({
   },
 
   moveToPage: function(stepIndex) {
+    if(this.state.currentStepIndex === stepIndex) {
+      return;
+    }
+
     var minIndex = 0;
     var maxIndex = React.Children.count(this.props.children) - 1;
 
@@ -198,6 +210,8 @@ var StepWizard = React.createClass({
 
     var currentIndex = this.state.currentStepIndex;
 
+    // Furthest Index that can be stepped to forward
+    // For going backwards we can always go back any distance
     var furthestIndex = this.calculateFurthestIndex();
     if(furthestIndex < stepIndex) {
       stepIndex = furthestIndex;
@@ -231,7 +245,7 @@ var StepWizard = React.createClass({
 
     return (
       <NavigationBeads
-        stepData={childrenData} 
+        stepData={childrenData}
         selectedIndex={this.state.currentStepIndex}
         onClick={this.moveToPage}/>
     );
@@ -279,6 +293,12 @@ var StepWizard = React.createClass({
     var beginningStepData = this.getStepDataAt(0);
     var prevStepData = this.getStepDataAt(index - 1);
     var nextStepData = this.getStepDataAt(index + 1);
+    var loopBeginningStepData = {
+      title: this.props.loopBeginningTitle || beginningStepData.title,
+      description: this.props.loopBeginningDescription || beginningStepData.description,
+      index: 0,
+      isUnreachable: false
+    }
     var isActive = currentIndex === index;
 
     var prevButton = null;
@@ -289,11 +309,10 @@ var StepWizard = React.createClass({
     } else if(nextStepData === null) {
       if(this.props.loopBeginning){
         prevButton = this.makeNavButton(prevStepData, this.onClickPrev, isActive, "sw-button-left");
-        nextButton = this.makeNavButton(beginningStepData, this.onClickNext, isActive, "sw-button-right");
+        nextButton = this.makeNavButton(loopBeginningStepData, this.onClickNext, isActive, "sw-button-right");
       }
       else
         prevButton = this.makeNavButton(prevStepData, this.onClickPrev, isActive, "sw-button-full");
-      
     } else {
       prevButton = this.makeNavButton(prevStepData, this.onClickPrev, isActive, "sw-button-left");
       nextButton = this.makeNavButton(nextStepData, this.onClickNext, isActive, "sw-button-right");
@@ -347,6 +366,7 @@ var StepWizard = React.createClass({
             {navigation}
           </div>
         </div>
+        <EventListener target={window} onPopstate={this.navigateBack} />
       </div>
     );
   },

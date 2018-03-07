@@ -1,5 +1,7 @@
 var React = require('react');
-var StepWizard = require('./lib/index.js');
+var ReactDOM = require('react-dom');
+var createReactClass = require('create-react-class');
+var StepWizard = require('./src/react-step-wizard.js');
 var Step = StepWizard.Step;
 
 function onNext(id) {
@@ -10,7 +12,7 @@ function onPrevious(id) {
   console.log((id - 1) + " <- " + id);
 }
 
-var App = React.createClass({
+var App = createReactClass({
   getInitialState: function() {
     return {
       isButtonPressed: false,
@@ -19,7 +21,7 @@ var App = React.createClass({
   },
 
   onTextChange: function() {
-    var value = this.refs.textInput.getDOMNode().value;
+    var value = this.refs.textInput.value;
     this.setState({hasText: value.length > 0});
   },
 
@@ -62,6 +64,6 @@ var App = React.createClass({
   }
 });
 
-React.render(
+ReactDOM.render(
   <App/>,
   document.getElementById('content'));
